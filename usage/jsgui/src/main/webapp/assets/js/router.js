@@ -168,15 +168,19 @@ define([
                 veryFirstViewLoad = !that.currentView;
                 that.showView("#application-content", homeView);
             }
-            this.applications.fetch({success:function () {
+            $.ajax('/v1/azure').done(function(azureInfo) {
                 render();
                 // show add application wizard if none already exist and this is the first page load
-                if ((veryFirstViewLoad && trail=='auto' && that.applications.isEmpty()) || (trail=='add_application') ) {
+                if ((veryFirstViewLoad && trail=='auto') || (trail=='add_application')) {
                     if (serverStatus.isMaster()) {
-                        homeView.createApplication();
+                        if (!azureInfo.azureLocationConfigured) {
+                            homeView.createLocation();
+                        } else if (!azureInfo.hasApps) {
+                            homeView.createApplication();
+                        }
                     }
                 }
-            }, error: render});
+           });
         },
         applicationsPage:function (app, trail, tab) {
             if (trail === undefined) trail = app

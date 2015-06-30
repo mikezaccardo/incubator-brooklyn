@@ -27,6 +27,7 @@ import brooklyn.rest.resources.AccessResource;
 import brooklyn.rest.resources.ActivityResource;
 import brooklyn.rest.resources.ApidocResource;
 import brooklyn.rest.resources.ApplicationResource;
+import brooklyn.rest.resources.AzureResource;
 import brooklyn.rest.resources.CatalogResource;
 import brooklyn.rest.resources.EffectorResource;
 import brooklyn.rest.resources.EntityConfigResource;
@@ -65,6 +66,7 @@ public class BrooklynRestApi {
         resources.add(new ServerResource());
         resources.add(new UsageResource());
         resources.add(new VersionResource());
+        resources.add(new AzureResource());
         return resources;
     }
 

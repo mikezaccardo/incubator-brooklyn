@@ -24,6 +24,7 @@ define([
     "jquery", "underscore", "backbone",
     "view/viewutils", 
     "view/application-add-wizard",
+    "view/add-azure-location-invoke",
     "view/ha-summary",
     "model/location",
     "text!tpl/home/applications.html",
@@ -31,7 +32,7 @@ define([
     "text!tpl/home/app-entry.html",
     "bootstrap", "brooklyn-utils"
 ], function ($, _, Backbone, ViewUtils,
-        AppAddWizard, HASummary, Location,
+        AppAddWizard, AddAzureLocation, HASummary, Location,
         ApplicationsHtml, HomeSummariesHtml, AppEntryHtml) {
 
     var HomeView = Backbone.View.extend({
@@ -150,6 +151,23 @@ define([
                         wizard.close()
                         that.collection.fetch({reset:true});
                     }).modal('show')
+            }
+        },
+
+        createLocation: function () {
+            if (this._modal) {
+                this._modal.close()
+            }
+            var that = this;
+            if (this.options.offline || (this.options.cautionOverlay && this.options.cautionOverlay.warningActive)) {
+                // don't show wizard
+            } else {
+                var wizard = new AddAzureLocation({
+                    el:"#add-azure-location-modal",
+                    home: this
+                });
+                this._modal = wizard;
+                wizard.render().$el.modal('show');
             }
         },
 
