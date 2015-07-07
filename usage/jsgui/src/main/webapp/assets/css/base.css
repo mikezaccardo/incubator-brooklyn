@@ -452,7 +452,7 @@ input[type="color"]:focus,.uneditable-input:focus {
 }
 
 #reload-brooklyn-properties-resource {
-	text-align: right;
+    text-align: right;
 }
 
 #clear-ha-node-records-resource {
@@ -1391,21 +1391,21 @@ input.error {
 
 /* hover menu at left, as used in sensors view */
 .floatGroup .floatLeft {
-	display:none;
-	width: 18px;
-	margin-left: -18px;
-	margin-top: -16px;
-	position: absolute;
-	overflow: visible;
+    display:none;
+    width: 18px;
+    margin-left: -18px;
+    margin-top: -16px;
+    position: absolute;
+    overflow: visible;
 }
 .floatGroup .floatDown {
-	display:none;
- 	position: absolute;
- 	margin-top: -2px;
-	overflow: visible;
+    display:none;
+    position: absolute;
+    margin-top: -2px;
+    overflow: visible;
 }
 .floatGroup .floatDown .light-popup {
-	display: block;
+    display: block;
     position: absolute;
     top: auto;
     z-index: 1;

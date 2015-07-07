@@ -31,7 +31,7 @@ define([
         },
 
         initialize: function() {
-            this.title = "Lorem ipsum";
+            this.title = "Azure location setup";
         },
         render: function() {
             this.$el.html(this.template({
@@ -40,7 +40,7 @@ define([
         },
         onSubmit: function() {
             var dlg = this;
-            if (!this.checkFields('subscriptionId', 'certificate')) {
+            if (!this.checkFields('subscriptionId', 'certificate', 'certificatePassword', 'consolePassword', 'confirmPassword')) {
                 return;
             }
             $("#azure-setup").ajaxSubmit({
@@ -59,17 +59,27 @@ define([
         },
         checkFields: function() {
             var dlg = this;
-            var success = true;
             for (var i = 0; i < arguments.length; i++) {
                 var label = this.$('label[for="' + arguments[i] + '"]')
                 var input = $('#' + label.attr('for'));
                 if (!input.val()) {
-                    dlg.showError(label.text() + ' is required but is empty.');
-                    success = false;
+                    dlg.showError(label.text() + ' must not be empty.');
                     return false;
                 }
             }
-            return success;
+
+            var passwordLabel = this.$('label[for="' + arguments[arguments.length - 2] + '"]')
+            var passwordText = $('#' + passwordLabel.attr('for'));
+
+            var confirmLabel = this.$('label[for="' + arguments[arguments.length - 1] + '"]')
+            var confirmText = $('#' + confirmLabel.attr('for'));
+
+            if (!confirmText.val() || passwordText.val() != confirmText.val()) {
+                dlg.showError('Password and confirmation do not match.');
+                return false;
+            }
+
+            return true;
         },
         showError: function (message) {
             this.$(".dialog-error").removeClass("hide");

@@ -61,6 +61,8 @@ import com.wordnik.swagger.core.ApiOperation;
 @Produces(MediaType.APPLICATION_JSON)
 public class AzureResource extends AbstractBrooklynRestResource  {
     private static final Logger log = LoggerFactory.getLogger(ApplicationResource.class);
+    
+    private static final String AZURE_ENDPOINT_BASE_URL = "https://management.core.windows.net/";
 
     @GET
     public Map<String, Boolean> info() {
@@ -97,12 +99,12 @@ public class AzureResource extends AbstractBrooklynRestResource  {
     }
 
     private void setupThrowing(FormDataMultiPart input) throws IOException, FileNotFoundException {
-        String subscriptionId = get(input, "subscriptionId");
+        String endpoint = AZURE_ENDPOINT_BASE_URL + get(input, "subscriptionId");
         File certificate = get(input, "certificate", File.class);
         String certificatePassword = get(input, "certificatePassword");
         String consolePassword = get(input, "consolePassword");
         
-        checkCredentials(subscriptionId, certificate.getAbsolutePath(), certificatePassword);
+        checkCredentials(endpoint, certificate.getAbsolutePath(), certificatePassword);
         
         File home = new File(System.getProperty("user.home"), ".brooklyn");
         home.mkdirs();
@@ -112,11 +114,12 @@ public class AzureResource extends AbstractBrooklynRestResource  {
 
         boolean hasConsolePassword = !Strings.isNullOrEmpty(consolePassword);
 
-        File propsFile = new File(home, "azure-brooklyn.properties");
+        File propsFile = new File(home, "brooklyn.properties");
         Properties props = new Properties();
-        props.setProperty("brooklyn.location.jclouds.azurecompute.identity", cert.getAbsolutePath());
-        props.setProperty("brooklyn.location.jclouds.azurecompute.credential", Strings.nullToEmpty(certificatePassword));
-        props.setProperty("brooklyn.location.jclouds.azurecompute.endpoint", "https://management.core.windows.net/" + subscriptionId);
+        props.setProperty("brooklyn.location.named.azure", "jclouds:azurecompute");
+        props.setProperty("brooklyn.location.named.azure.identity", cert.getAbsolutePath());
+        props.setProperty("brooklyn.location.named.azure.credential", Strings.nullToEmpty(certificatePassword));
+        props.setProperty("brooklyn.location.named.azure.endpoint", endpoint);
         if (hasConsolePassword) {
             props.setProperty("brooklyn.webconsole.security.users", "amp");
             props.setProperty("brooklyn.webconsole.security.user.amp.password", consolePassword);
@@ -140,8 +143,8 @@ public class AzureResource extends AbstractBrooklynRestResource  {
         }
     }
     
-    private void checkCredentials(String subscriptionId, String certificate, String certificatePassword) {
-        ComputeService compute = createComputeService(certificate, certificatePassword);
+    private void checkCredentials(String endpoint, String certificate, String certificatePassword) {
+        ComputeService compute = createComputeService(endpoint, certificate, certificatePassword);
         try {
             if (compute.listAssignableLocations().size() == 0) {
                 throw new IllegalStateException("Invalid credentials");
@@ -151,7 +154,7 @@ public class AzureResource extends AbstractBrooklynRestResource  {
         }
     }
 
-    private ComputeService createComputeService(String certificate, String certificatePassword) {
+    private ComputeService createComputeService(String endpoint, String certificate, String certificatePassword) {
         Properties properties = new Properties();
         properties.setProperty(ComputeServiceProperties.TIMEOUT_SCRIPT_COMPLETE, Long.toString(TimeUnit.MINUTES.toMillis(1)));
 
@@ -161,6 +164,7 @@ public class AzureResource extends AbstractBrooklynRestResource  {
 
         ContextBuilder builder = ContextBuilder.newBuilder("azurecompute")
                                                .credentials(certificate, certificatePassword)
+                                               .endpoint(endpoint)
                                                .modules(modules)
                                                .overrides(properties);
 
