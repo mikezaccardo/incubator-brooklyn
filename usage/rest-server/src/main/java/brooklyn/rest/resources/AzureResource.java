@@ -112,14 +112,21 @@ public class AzureResource extends AbstractBrooklynRestResource  {
         File cert = new File(home, "certificate.p12");
         Files.move(certificate, cert);
 
-        boolean hasConsolePassword = !Strings.isNullOrEmpty(consolePassword);
-
         File propsFile = new File(home, "brooklyn.properties");
         Properties props = new Properties();
-        props.setProperty("brooklyn.location.named.azure", "jclouds:azurecompute");
+        
+        props.setProperty("brooklyn.location.named.azure", "jclouds:azurecompute:East US");
         props.setProperty("brooklyn.location.named.azure.identity", cert.getAbsolutePath());
         props.setProperty("brooklyn.location.named.azure.credential", Strings.nullToEmpty(certificatePassword));
         props.setProperty("brooklyn.location.named.azure.endpoint", endpoint);
+        props.setProperty("brooklyn.location.named.azure.imageId", "b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-14_04_1-LTS-amd64-server-20150123-en-us-30GB");
+        props.setProperty("brooklyn.location.named.azure.hardwareId", "BASIC_A2");
+        props.setProperty("brooklyn.location.named.azure.displayName", "Azure");
+        props.setProperty("brooklyn.location.named.azure.vmNameMaxLength", "45");
+        props.setProperty("brooklyn.location.named.azure.jclouds.azurecompute.operation.timeout", "120000");
+        
+        boolean hasConsolePassword = !Strings.isNullOrEmpty(consolePassword);
+        
         if (hasConsolePassword) {
             props.setProperty("brooklyn.webconsole.security.users", "amp");
             props.setProperty("brooklyn.webconsole.security.user.amp.password", consolePassword);
