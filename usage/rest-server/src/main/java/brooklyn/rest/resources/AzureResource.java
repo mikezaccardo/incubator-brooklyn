@@ -45,6 +45,7 @@ import org.python.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import brooklyn.location.LocationDefinition;
 import brooklyn.location.jclouds.JcloudsLocation;
 import brooklyn.util.stream.Streams;
 
@@ -90,12 +91,19 @@ public class AzureResource extends AbstractBrooklynRestResource  {
     }
 
     private boolean hasAzureLocationConfigured() {
-        try {
-            return mgmt().getLocationRegistry().resolve("jclouds:azurecompute").getConfig(JcloudsLocation.ACCESS_IDENTITY) != null;
-        } catch (Exception e) {
-            log.debug("Unable to resolve azure location", e);
+        LocationDefinition azureLocationDefinition = mgmt().getLocationRegistry().getDefinedLocationByName("azure");
+
+        if (azureLocationDefinition == null) {
+            log.debug("Azure location not found.");
             return false;
         }
+
+        if (azureLocationDefinition.getConfig().get(JcloudsLocation.ACCESS_IDENTITY.getName()) == null) {
+            log.debug("Azure identity not set.");
+            return false;
+        }
+
+        return true;
     }
 
     private void setupThrowing(FormDataMultiPart input) throws IOException, FileNotFoundException {
