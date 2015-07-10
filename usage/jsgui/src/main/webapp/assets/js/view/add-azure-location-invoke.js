@@ -49,7 +49,9 @@ define([
                 success: function(responseText, statusText, xhr, form) {
                     //No access to responseCode (iframe transport)
                     if ("done" == responseText) {
-                        dlg.close();
+                    	dlg.close();
+                        $('body').removeClass('modal-open');
+                        $('.modal-backdrop').remove();
                         dlg.options.home.createApplication();
                     } else {
                         dlg.showError("Couldn't connect to Azure, check if the credentials are valid.");

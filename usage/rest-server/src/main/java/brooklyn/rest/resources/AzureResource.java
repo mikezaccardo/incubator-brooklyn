@@ -151,11 +151,6 @@ public class AzureResource extends AbstractBrooklynRestResource  {
                 PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
         
         mgmt().reloadBrooklynProperties();
-        
-        if (hasConsolePassword) {
-        //reload console credentials
-//        Runtime.getRuntime().exec("sudo /etc/init.d/amp restart");
-        }
     }
     
     private void checkCredentials(String endpoint, String certificate, String certificatePassword) {

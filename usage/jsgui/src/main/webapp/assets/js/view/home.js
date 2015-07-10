@@ -167,7 +167,12 @@ define([
                     home: this
                 });
                 this._modal = wizard;
-                wizard.render().$el.modal('show');
+                wizard.render().$el.modal({
+                    backdrop: 'static',
+                    keyboard: false,
+                    show: true
+                });
+                wizard.render().$el.find('.close').remove();
             }
         },
 
