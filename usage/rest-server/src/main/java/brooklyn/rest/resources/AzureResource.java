@@ -24,6 +24,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -41,7 +42,6 @@ import org.jclouds.compute.ComputeServiceContext;
 import org.jclouds.compute.config.ComputeServiceProperties;
 import org.jclouds.logging.slf4j.config.SLF4JLoggingModule;
 import org.jclouds.sshj.config.SshjSshClientModule;
-import org.python.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +49,9 @@ import brooklyn.location.LocationDefinition;
 import brooklyn.location.jclouds.JcloudsLocation;
 import brooklyn.util.stream.Streams;
 
+import com.google.common.base.Predicate;
+import com.google.common.base.Strings;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
@@ -91,18 +94,28 @@ public class AzureResource extends AbstractBrooklynRestResource  {
     }
 
     private boolean hasAzureLocationConfigured() {
-        LocationDefinition azureLocationDefinition = mgmt().getLocationRegistry().getDefinedLocationByName("azure");
+        Collection<LocationDefinition> definedAzureLocations = 
+                Collections2.filter(mgmt().getLocationRegistry().getDefinedLocations().values(), 
+                    new Predicate<LocationDefinition>() {
+                        @Override
+                        public boolean apply(LocationDefinition input) {
+                            String spec = input.getSpec();
+                            
+                            if (Strings.isNullOrEmpty(spec) || !spec.startsWith("jclouds:azurecompute"))
+                                return false;
+                            
+                            if (input.getConfig().get(JcloudsLocation.ACCESS_IDENTITY.getName()) == null)
+                                return false;
+                            
+                            return true;
+                        }
+                    });
 
-        if (azureLocationDefinition == null) {
+        if (definedAzureLocations.isEmpty()) {
             log.debug("Azure location not found.");
             return false;
         }
-
-        if (azureLocationDefinition.getConfig().get(JcloudsLocation.ACCESS_IDENTITY.getName()) == null) {
-            log.debug("Azure identity not set.");
-            return false;
-        }
-
+        
         return true;
     }
 
