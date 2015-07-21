@@ -25,9 +25,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.jclouds.compute.options.RunScriptOptions.Builder.overrideLoginCredentials;
 import static org.jclouds.scriptbuilder.domain.Statements.exec;
-
-import brooklyn.util.flags.MethodCoercions;
-import brooklyn.location.basic.AbstractLocation;
 import io.cloudsoft.winrm4j.pywinrm.Session;
 import io.cloudsoft.winrm4j.pywinrm.WinRMFactory;
 
@@ -108,6 +105,7 @@ import brooklyn.location.MachineManagementMixins.RichMachineProvisioningLocation
 import brooklyn.location.NoMachinesAvailableException;
 import brooklyn.location.access.PortForwardManager;
 import brooklyn.location.access.PortMapping;
+import brooklyn.location.basic.AbstractLocation;
 import brooklyn.location.basic.BasicMachineMetadata;
 import brooklyn.location.basic.LocationConfigKeys;
 import brooklyn.location.basic.LocationConfigUtils;
@@ -132,6 +130,7 @@ import brooklyn.util.crypto.SecureKeys;
 import brooklyn.util.exceptions.CompoundRuntimeException;
 import brooklyn.util.exceptions.Exceptions;
 import brooklyn.util.exceptions.ReferenceWithError;
+import brooklyn.util.flags.MethodCoercions;
 import brooklyn.util.flags.SetFromFlag;
 import brooklyn.util.flags.TypeCoercions;
 import brooklyn.util.guava.Maybe;
@@ -181,7 +180,6 @@ import com.google.common.collect.Sets.SetView;
 import com.google.common.io.Files;
 import com.google.common.net.HostAndPort;
 import com.google.common.primitives.Ints;
-import com.google.common.reflect.TypeToken;
 
 /**
  * For provisioning and managing VMs in a particular provider/region, using jclouds.
@@ -673,7 +671,15 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
                 // "Name" metadata seems to set the display name; at least in AWS
                 // TODO it would be nice if this salt comes from the location's ID (but we don't know that yet as the ssh machine location isn't created yet)
                 // TODO in softlayer we want to control the suffix of the hostname which is 3 random hex digits
-                template.getOptions().getUserMetadata().put("Name", cloudMachineNamer.generateNewMachineUniqueNameFromGroupId(setup, groupId));
+                String name = cloudMachineNamer.generateNewMachineUniqueNameFromGroupId(setup, groupId);
+                template.getOptions().getUserMetadata().put("Name", name);
+                
+                if (Objects.equal(setup.get(CLOUD_PROVIDER), "azurecompute")) {
+                    Set<String> nodeNames = Sets.newLinkedHashSet(template.getOptions().getNodeNames());
+                    nodeNames.add(name);
+                    
+                    template.getOptions().nodeNames(nodeNames);
+                }
                 
                 if (setup.get(JcloudsLocationConfig.INCLUDE_BROOKLYN_USER_METADATA)) {
                     template.getOptions().getUserMetadata().put("brooklyn-user", System.getProperty("user.name"));

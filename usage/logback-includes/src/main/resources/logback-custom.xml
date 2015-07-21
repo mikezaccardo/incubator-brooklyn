@@ -41,5 +41,7 @@
     <property name="logging.dir" scope="context" value="./" />
 
       -->
+      
+          <include resource="brooklyn/logback-logger-debug-jclouds.xml"/>
 
 </included>
