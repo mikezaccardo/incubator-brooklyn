@@ -102,6 +102,7 @@ public class MySqlNodeImpl extends SoftwareProcessImpl implements MySqlNode {
                     .poll(new SshPollConfig<Double>(QUERIES_PER_SECOND_FROM_MYSQL)
                             .command(cmd)
                             .onSuccess(new Function<SshPollValue, Double>() {
+                                @Override
                                 public Double apply(SshPollValue input) {
                                     String q = Strings.getFirstWordAfter(input.getStdout(), "Queries per second avg:");
                                     if (q==null) return null;
