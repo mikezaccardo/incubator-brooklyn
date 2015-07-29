@@ -23,9 +23,13 @@ import java.util.Collection;
 import brooklyn.entity.Entity;
 import brooklyn.entity.basic.AbstractEntity;
 import brooklyn.entity.basic.Entities;
+import brooklyn.entity.basic.EntityInternal;
 import brooklyn.entity.group.DynamicCluster;
 import brooklyn.entity.proxying.EntitySpec;
 import brooklyn.entity.trait.Startable;
+import brooklyn.event.AttributeSensor;
+import brooklyn.event.SensorEvent;
+import brooklyn.event.SensorEventListener;
 import brooklyn.location.Location;
 
 public class RedisClusterImpl extends AbstractEntity implements RedisCluster {
@@ -79,5 +83,23 @@ public class RedisClusterImpl extends AbstractEntity implements RedisCluster {
         }
         return up;
     }
+    
+    @Override
+    public void init() {
+        super.init();
 
+        subscribe(master, RedisStore.ADDRESS, new MasterAttributePropagator());
+        subscribe(master, RedisStore.REDIS_PORT, new MasterAttributePropagator());
+    }
+
+    private class MasterAttributePropagator implements SensorEventListener<Object> {
+        @Override
+        public void onEvent(SensorEvent<Object> event) {
+            Entity node = event.getSource();
+            
+            if (node instanceof RedisStore) {
+                ((EntityInternal) RedisClusterImpl.this).setAttribute((AttributeSensor<Object>) event.getSensor(), event.getValue());
+            }
+        }
+    }
 }
