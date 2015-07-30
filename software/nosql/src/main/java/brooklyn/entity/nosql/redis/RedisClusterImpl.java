@@ -83,12 +83,16 @@ public class RedisClusterImpl extends AbstractEntity implements RedisCluster {
         }
         return up;
     }
-    
+
     @Override
     public void init() {
         super.init();
 
+        subscribe(master, RedisStore.HOSTNAME, new MasterAttributePropagator());
         subscribe(master, RedisStore.ADDRESS, new MasterAttributePropagator());
+        subscribe(master, RedisStore.SUBNET_HOSTNAME, new MasterAttributePropagator());
+        subscribe(master, RedisStore.SUBNET_ADDRESS, new MasterAttributePropagator());
+
         subscribe(master, RedisStore.REDIS_PORT, new MasterAttributePropagator());
     }
 
@@ -96,7 +100,7 @@ public class RedisClusterImpl extends AbstractEntity implements RedisCluster {
         @Override
         public void onEvent(SensorEvent<Object> event) {
             Entity node = event.getSource();
-            
+
             if (node instanceof RedisStore) {
                 ((EntityInternal) RedisClusterImpl.this).setAttribute((AttributeSensor<Object>) event.getSensor(), event.getValue());
             }
