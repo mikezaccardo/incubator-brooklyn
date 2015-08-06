@@ -27,6 +27,12 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.net.HostAndPort;
+
 import brooklyn.config.ConfigKey;
 import brooklyn.entity.basic.ConfigKeys;
 import brooklyn.entity.basic.Sanitizer;
@@ -40,12 +46,6 @@ import brooklyn.util.flags.TypeCoercions;
 import brooklyn.util.net.UserAndHostAndPort;
 import brooklyn.util.text.WildcardGlobs;
 import brooklyn.util.text.WildcardGlobs.PhraseTreatment;
-
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.net.HostAndPort;
 
 /**
  * Examples of valid specs:
@@ -96,7 +96,11 @@ public class ByonLocationResolver extends AbstractLocationResolver {
         String user = (String) config.getStringKey("user");
         Integer port = (Integer) TypeCoercions.coerce(config.getStringKey("port"), Integer.class);
         Class<? extends MachineLocation> locationClass = OS_TO_MACHINE_LOCATION_TYPE.get(config.get(OS_FAMILY));
-        
+
+        MutableMap<String, Object> defaultProps = MutableMap.of();
+        defaultProps.addIfNotNull("user", user);
+        defaultProps.addIfNotNull("port", port);
+
         List<String> hostAddresses;
         
         if (hosts instanceof String) {
@@ -119,9 +123,9 @@ public class ByonLocationResolver extends AbstractLocationResolver {
         for (Object host : hostAddresses) {
             LocationSpec<? extends MachineLocation> machineSpec;
             if (host instanceof String) {
-                machineSpec = parseMachine((String)host, locationClass, MutableMap.of("user", user, "port", port), spec);
+                machineSpec = parseMachine((String)host, locationClass, defaultProps, spec);
             } else if (host instanceof Map) {
-                machineSpec = parseMachine((Map<String, ?>)host, locationClass, MutableMap.of("user", user, "port", port), spec);
+                machineSpec = parseMachine((Map<String, ?>)host, locationClass, defaultProps, spec);
             } else {
                 throw new IllegalArgumentException("Expected machine to be String or Map, but was "+host.getClass().getName()+" ("+host+")");
             }
@@ -142,16 +146,33 @@ public class ByonLocationResolver extends AbstractLocationResolver {
         String osfamily = (String) machineConfig.remove(OS_FAMILY.getName());
         String ssh = (String) machineConfig.remove("ssh");
         String winrm = (String) machineConfig.remove("winrm");
+        Map<Integer, String> tcpPortMappings = (Map<Integer, String>) machineConfig.get("tcpPortMappings");
+        
         checkArgument(ssh != null ^ winrm != null, "Must specify exactly one of 'ssh' or 'winrm' for machine: %s", valSanitized);
         
         UserAndHostAndPort userAndHostAndPort;
+        String host;
+        int port;
         if (ssh != null) {
-            userAndHostAndPort = parseUserAndHostAndPort((String)ssh);
+            userAndHostAndPort = parseUserAndHostAndPort((String)ssh, 22);
         } else {
-            userAndHostAndPort = parseUserAndHostAndPort((String)winrm);
+            userAndHostAndPort = parseUserAndHostAndPort((String)winrm, 5985);
         }
         
-        String host = userAndHostAndPort.getHostAndPort().getHostText().trim();
+        // If there is a tcpPortMapping defined for the connection-port, then use that for ssh/winrm machine
+        port = userAndHostAndPort.getHostAndPort().getPort();
+        if (tcpPortMappings != null && tcpPortMappings.containsKey(port)) {
+            String override = tcpPortMappings.get(port);
+            HostAndPort hostAndPortOverride = HostAndPort.fromString(override);
+            if (!hostAndPortOverride.hasPort()) {
+                throw new IllegalArgumentException("Invalid portMapping ('"+override+"') for port "+port+" in "+specForErrMsg);
+            }
+            port = hostAndPortOverride.getPort();
+            host = hostAndPortOverride.getHostText().trim();
+        } else {
+            host = userAndHostAndPort.getHostAndPort().getHostText().trim();
+        }
+        
         machineConfig.put("address", host);
         try {
             InetAddress.getByName(host);
@@ -165,7 +186,7 @@ public class ByonLocationResolver extends AbstractLocationResolver {
         }
         if (userAndHostAndPort.getHostAndPort().hasPort()) {
             checkArgument(!vals.containsKey("port"), "Must not specify port twice for machine: %s", valSanitized);
-            machineConfig.put("port", userAndHostAndPort.getHostAndPort().getPort());
+            machineConfig.put("port", port);
         }
         for (Map.Entry<String, ?> entry : defaults.entrySet()) {
             if (!machineConfig.containsKey(entry.getKey())) {
@@ -183,7 +204,7 @@ public class ByonLocationResolver extends AbstractLocationResolver {
 
     protected LocationSpec<? extends MachineLocation> parseMachine(String val, Class<? extends MachineLocation> locationClass, Map<String, ?> defaults, String specForErrMsg) {
         Map<String, Object> machineConfig = Maps.newLinkedHashMap();
-
+        
         UserAndHostAndPort userAndHostAndPort = parseUserAndHostAndPort(val);
         
         String host = userAndHostAndPort.getHostAndPort().getHostText().trim();
@@ -217,5 +238,13 @@ public class ByonLocationResolver extends AbstractLocationResolver {
             hostPart = val.substring(val.indexOf("@")+1);
         }
         return UserAndHostAndPort.fromParts(userPart, HostAndPort.fromString(hostPart));
+    }
+    
+    private UserAndHostAndPort parseUserAndHostAndPort(String val, int defaultPort) {
+        UserAndHostAndPort result = parseUserAndHostAndPort(val);
+        if (!result.getHostAndPort().hasPort()) {
+            result = UserAndHostAndPort.fromParts(result.getUser(), result.getHostAndPort().getHostText(), defaultPort);
+        }
+        return result;
     }
 }

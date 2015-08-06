@@ -122,6 +122,22 @@ public interface SoftwareProcess extends Entity, Startable {
     @Deprecated
     ConfigKey<String> SUGGESTED_RUN_DIR = BrooklynConfigKeys.SUGGESTED_RUN_DIR;
 
+    public static final ConfigKey<Boolean> OPEN_IPTABLES = ConfigKeys.newBooleanConfigKey("openIptables", 
+            "Whether to open the INBOUND_PORTS via iptables rules; " +
+            "if true then ssh in to run iptables commands, as part of machine provisioning", false);
+
+    public static final ConfigKey<Boolean> STOP_IPTABLES = ConfigKeys.newBooleanConfigKey("stopIptables", 
+            "Whether to stop iptables entirely; " +
+            "if true then ssh in to stop the iptables service, as part of machine provisioning", false);
+
+    public static final ConfigKey<Boolean> DONT_REQUIRE_TTY_FOR_SUDO = ConfigKeys.newBooleanConfigKey("dontRequireTtyForSudo", 
+            "Whether to explicitly set /etc/sudoers, so don't need tty (will leave unchanged if 'false'); " +
+            "some machines require a tty for sudo; brooklyn by default does not use a tty " +
+            "(so that it can get separate error+stdout streams); you can enable a tty as an " +
+            "option to every ssh command, or you can do it once and " +
+            "modify the machine so that a tty is not subsequently required.",
+            false);
+    
     /**
      * Files to be copied to the server before pre-install.
      * <p>
@@ -323,17 +339,6 @@ public interface SoftwareProcess extends Entity, Startable {
                 "ALWAYS will try to stop the machine even if the entity is marked as stopped, " +
                 "IF_NOT_STOPPED stops the machine only if the entity is not marked as stopped, " +
                 "NEVER doesn't stop the machine.", StopMode.IF_NOT_STOPPED);
-
-        /** @since 0.7.0 semantics of parameters to restart being explored
-         *  @deprecated since 0.7.0 use  {@link #STOP_MACHINE_MODE} instead */
-        @Beta
-        @Deprecated
-        public static final ConfigKey<Boolean> STOP_MACHINE = ConfigKeys.newBooleanConfigKey("stopMachine",
-                "Whether to stop the machine provisioned for this entity:  'true', or 'false' are supported, " +
-                "with the default being 'true'." +
-                " 'true' is equivalent to " + STOP_MACHINE_MODE.getName() + " = " + StopMode.IF_NOT_STOPPED.name() + "." +
-                " 'false' is equivalent to " + STOP_MACHINE_MODE.getName() + " = " + StopMode.NEVER.name() + ".", true);
-
     }
     
     // NB: the START, STOP, and RESTART effectors themselves are (re)defined by MachineLifecycleEffectorTasks

@@ -26,11 +26,6 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.jclouds.compute.options.RunScriptOptions.Builder.overrideLoginCredentials;
 import static org.jclouds.scriptbuilder.domain.Statements.exec;
 
-import brooklyn.util.flags.MethodCoercions;
-import brooklyn.location.basic.AbstractLocation;
-import io.cloudsoft.winrm4j.pywinrm.Session;
-import io.cloudsoft.winrm4j.pywinrm.WinRMFactory;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -93,70 +88,6 @@ import org.jclouds.softlayer.compute.options.SoftLayerTemplateOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import brooklyn.config.ConfigKey;
-import brooklyn.config.ConfigKey.HasConfigKey;
-import brooklyn.config.ConfigUtils;
-import brooklyn.entity.Entity;
-import brooklyn.entity.basic.Sanitizer;
-import brooklyn.entity.rebind.persister.LocationWithObjectStore;
-import brooklyn.entity.rebind.persister.PersistenceObjectStore;
-import brooklyn.entity.rebind.persister.jclouds.JcloudsBlobStoreBasedObjectStore;
-import brooklyn.location.LocationSpec;
-import brooklyn.location.MachineLocation;
-import brooklyn.location.MachineManagementMixins.MachineMetadata;
-import brooklyn.location.MachineManagementMixins.RichMachineProvisioningLocation;
-import brooklyn.location.NoMachinesAvailableException;
-import brooklyn.location.access.PortForwardManager;
-import brooklyn.location.access.PortMapping;
-import brooklyn.location.basic.BasicMachineMetadata;
-import brooklyn.location.basic.LocationConfigKeys;
-import brooklyn.location.basic.LocationConfigUtils;
-import brooklyn.location.basic.LocationConfigUtils.OsCredential;
-import brooklyn.location.basic.SshMachineLocation;
-import brooklyn.location.basic.WinRmMachineLocation;
-import brooklyn.location.cloud.AbstractCloudMachineProvisioningLocation;
-import brooklyn.location.cloud.AvailabilityZoneExtension;
-import brooklyn.location.cloud.names.AbstractCloudMachineNamer;
-import brooklyn.location.cloud.names.CloudMachineNamer;
-import brooklyn.location.jclouds.JcloudsPredicates.NodeInLocation;
-import brooklyn.location.jclouds.networking.JcloudsPortForwarderExtension;
-import brooklyn.location.jclouds.templates.PortableTemplateBuilder;
-import brooklyn.location.jclouds.zone.AwsAvailabilityZoneExtension;
-import brooklyn.management.AccessController;
-import brooklyn.util.ResourceUtils;
-import brooklyn.util.collections.MutableList;
-import brooklyn.util.collections.MutableMap;
-import brooklyn.util.collections.MutableSet;
-import brooklyn.util.config.ConfigBag;
-import brooklyn.util.crypto.SecureKeys;
-import brooklyn.util.exceptions.CompoundRuntimeException;
-import brooklyn.util.exceptions.Exceptions;
-import brooklyn.util.exceptions.ReferenceWithError;
-import brooklyn.util.flags.SetFromFlag;
-import brooklyn.util.flags.TypeCoercions;
-import brooklyn.util.guava.Maybe;
-import brooklyn.util.internal.ssh.ShellTool;
-import brooklyn.util.internal.ssh.SshTool;
-import brooklyn.util.javalang.Enums;
-import brooklyn.util.javalang.Reflections;
-import brooklyn.util.net.Cidr;
-import brooklyn.util.net.Networking;
-import brooklyn.util.net.Protocol;
-import brooklyn.util.os.Os;
-import brooklyn.util.repeat.Repeater;
-import brooklyn.util.ssh.BashCommands;
-import brooklyn.util.ssh.IptablesCommands;
-import brooklyn.util.ssh.IptablesCommands.Chain;
-import brooklyn.util.ssh.IptablesCommands.Policy;
-import brooklyn.util.stream.Streams;
-import brooklyn.util.text.ByteSizeStrings;
-import brooklyn.util.text.Identifiers;
-import brooklyn.util.text.KeyValueParser;
-import brooklyn.util.text.Strings;
-import brooklyn.util.text.TemplateProcessor;
-import brooklyn.util.time.Duration;
-import brooklyn.util.time.Time;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.base.Function;
@@ -181,14 +112,85 @@ import com.google.common.collect.Sets.SetView;
 import com.google.common.io.Files;
 import com.google.common.net.HostAndPort;
 import com.google.common.primitives.Ints;
-import com.google.common.reflect.TypeToken;
+
+import brooklyn.config.ConfigKey;
+import brooklyn.config.ConfigKey.HasConfigKey;
+import brooklyn.config.ConfigUtils;
+import brooklyn.entity.Entity;
+import brooklyn.entity.basic.Sanitizer;
+import brooklyn.entity.rebind.persister.LocationWithObjectStore;
+import brooklyn.entity.rebind.persister.PersistenceObjectStore;
+import brooklyn.entity.rebind.persister.jclouds.JcloudsBlobStoreBasedObjectStore;
+import brooklyn.location.LocationSpec;
+import brooklyn.location.MachineLocation;
+import brooklyn.location.MachineLocationCustomizer;
+import brooklyn.location.MachineManagementMixins.MachineMetadata;
+import brooklyn.location.MachineManagementMixins.RichMachineProvisioningLocation;
+import brooklyn.location.MachineManagementMixins.SuspendsMachines;
+import brooklyn.location.NoMachinesAvailableException;
+import brooklyn.location.access.PortForwardManager;
+import brooklyn.location.access.PortMapping;
+import brooklyn.location.basic.AbstractLocation;
+import brooklyn.location.basic.BasicMachineMetadata;
+import brooklyn.location.basic.LocationConfigKeys;
+import brooklyn.location.basic.LocationConfigUtils;
+import brooklyn.location.basic.LocationConfigUtils.OsCredential;
+import brooklyn.location.basic.SshMachineLocation;
+import brooklyn.location.basic.WinRmMachineLocation;
+import brooklyn.location.cloud.AbstractCloudMachineProvisioningLocation;
+import brooklyn.location.cloud.AvailabilityZoneExtension;
+import brooklyn.location.cloud.names.AbstractCloudMachineNamer;
+import brooklyn.location.cloud.names.CloudMachineNamer;
+import brooklyn.location.jclouds.JcloudsPredicates.NodeInLocation;
+import brooklyn.location.jclouds.networking.JcloudsPortForwarderExtension;
+import brooklyn.location.jclouds.templates.PortableTemplateBuilder;
+import brooklyn.location.jclouds.zone.AwsAvailabilityZoneExtension;
+import brooklyn.management.AccessController;
+import brooklyn.util.ResourceUtils;
+import brooklyn.util.collections.MutableList;
+import brooklyn.util.collections.MutableMap;
+import brooklyn.util.collections.MutableSet;
+import brooklyn.util.config.ConfigBag;
+import brooklyn.util.crypto.SecureKeys;
+import brooklyn.util.exceptions.CompoundRuntimeException;
+import brooklyn.util.exceptions.Exceptions;
+import brooklyn.util.exceptions.ReferenceWithError;
+import brooklyn.util.flags.MethodCoercions;
+import brooklyn.util.flags.SetFromFlag;
+import brooklyn.util.flags.TypeCoercions;
+import brooklyn.util.guava.Maybe;
+import brooklyn.util.internal.ssh.ShellTool;
+import brooklyn.util.internal.ssh.SshTool;
+import brooklyn.util.javalang.Enums;
+import brooklyn.util.javalang.Reflections;
+import brooklyn.util.net.Cidr;
+import brooklyn.util.net.Networking;
+import brooklyn.util.net.Protocol;
+import brooklyn.util.os.Os;
+import brooklyn.util.repeat.Repeater;
+import brooklyn.util.ssh.BashCommands;
+import brooklyn.util.ssh.IptablesCommands;
+import brooklyn.util.ssh.IptablesCommands.Chain;
+import brooklyn.util.ssh.IptablesCommands.Policy;
+import brooklyn.util.stream.Streams;
+import brooklyn.util.text.ByteSizeStrings;
+import brooklyn.util.text.Identifiers;
+import brooklyn.util.text.KeyValueParser;
+import brooklyn.util.text.Strings;
+import brooklyn.util.text.TemplateProcessor;
+import brooklyn.util.time.Duration;
+import brooklyn.util.time.Time;
+import io.cloudsoft.winrm4j.pywinrm.Session;
+import io.cloudsoft.winrm4j.pywinrm.WinRMFactory;
 
 /**
  * For provisioning and managing VMs in a particular provider/region, using jclouds.
  * Configuration flags are defined in {@link JcloudsLocationConfig}.
  */
 @SuppressWarnings("serial")
-public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation implements JcloudsLocationConfig, RichMachineProvisioningLocation<MachineLocation>, LocationWithObjectStore {
+public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation implements
+        JcloudsLocationConfig, RichMachineProvisioningLocation<MachineLocation>,
+        LocationWithObjectStore, SuspendsMachines {
 
     // TODO After converting from Groovy to Java, this is now very bad code! It relies entirely on putting
     // things into and taking them out of maps; it's not type-safe, and it's thus very error-prone.
@@ -233,6 +235,7 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
     }
 
     @Override
+    @Deprecated
     public JcloudsLocation configure(Map<?,?> properties) {
         super.configure(properties);
 
@@ -255,7 +258,7 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
             if (maxConcurrent == null || maxConcurrent < 1) {
                 throw new IllegalStateException(MAX_CONCURRENT_MACHINE_CREATIONS.getName() + " must be >= 1, but was "+maxConcurrent);
             }
-            setConfig(MACHINE_CREATION_SEMAPHORE, new Semaphore(maxConcurrent, true));
+            config().set(MACHINE_CREATION_SEMAPHORE, new Semaphore(maxConcurrent, true));
         }
         return this;
     }
@@ -440,8 +443,13 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
         return result;
     }
 
+    protected Collection<MachineLocationCustomizer> getMachineCustomizers(ConfigBag setup) {
+        Collection<MachineLocationCustomizer> customizers = setup.get(MACHINE_LOCATION_CUSTOMIZERS);
+        return (customizers == null ? ImmutableList.<MachineLocationCustomizer>of() : customizers);
+    }
+
     public void setDefaultImageId(String val) {
-        setConfig(DEFAULT_IMAGE_ID, val);
+        config().set(DEFAULT_IMAGE_ID, val);
     }
 
     // TODO remove tagMapping, or promote it
@@ -454,6 +462,7 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
 
     // TODO Decide on semantics. If I give "TomcatServer" and "Ubuntu", then must I get back an image that matches both?
     // Currently, just takes first match that it finds...
+    @Override
     public Map<String,Object> getProvisioningFlags(Collection<String> tags) {
         Map<String,Object> result = Maps.newLinkedHashMap();
         Collection<String> unmatchedTags = Lists.newArrayList();
@@ -542,6 +551,7 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
             node);
     }
 
+    @Override
     public MachineMetadata getMachineMetadata(MachineLocation l) {
         if (l instanceof JcloudsSshMachineLocation) {
             return getMachineMetadata( ((JcloudsSshMachineLocation)l).node );
@@ -586,6 +596,7 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
      * as well as ACCESS_IDENTITY and ACCESS_CREDENTIAL,
      * plus any further properties to specify e.g. images, hardware profiles, accessing user
      * (for initial login, and a user potentially to create for subsequent ie normal access) */
+    @Override
     public MachineLocation obtain(Map<?,?> flags) throws NoMachinesAvailableException {
         ConfigBag setup = ConfigBag.newInstanceExtending(config().getBag(), flags);
         Integer attempts = setup.get(MACHINE_CREATE_ATTEMPTS);
@@ -874,8 +885,10 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
 
                 if (setup.get(OPEN_IPTABLES)) {
                     if (windows) {
-                        LOG.warn("Ignoring flag OPEN_IPTABLES on Windows location {}", machineLocation);
+                        LOG.warn("Ignoring DEPRECATED flag OPEN_IPTABLES on Windows location {}", machineLocation);
                     } else {
+                        LOG.warn("Using DEPRECATED flag OPEN_IPTABLES (will not be supported in future versions) for {} at {}", machineLocation, this);
+                        
                         @SuppressWarnings("unchecked")
                         Iterable<Integer> inboundPorts = (Iterable<Integer>) setup.get(INBOUND_PORTS);
 
@@ -914,8 +927,10 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
 
                 if (setup.get(STOP_IPTABLES)) {
                     if (windows) {
-                        LOG.warn("Ignoring flag OPEN_IPTABLES on Windows location {}", machineLocation);
+                        LOG.warn("Ignoring DEPRECATED flag OPEN_IPTABLES on Windows location {}", machineLocation);
                     } else {
+                        LOG.warn("Using DEPRECATED flag STOP_IPTABLES (will not be supported in future versions) for {} at {}", machineLocation, this);
+                        
                         customisationForLogging.add("stop iptables");
 
                         List<String> cmds = ImmutableList.<String>of();
@@ -950,6 +965,9 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
             // Apply any optional app-specific customization.
             for (JcloudsLocationCustomizer customizer : getCustomizers(setup)) {
                 customizer.customize(this, computeService, machineLocation);
+            }
+            for (MachineLocationCustomizer customizer : getMachineCustomizers(setup)) {
+                customizer.customize(machineLocation);
             }
 
             customizedTimestamp = Duration.of(provisioningStopwatch);
@@ -1005,6 +1023,35 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
             }
 
             throw Exceptions.propagate(e);
+        }
+    }
+
+    // ------------- suspend and resume ------------------------------------
+
+    /**
+     * Suspends the given location.
+     * <p>
+     * Note that this method does <b>not</b> call the lifecycle methods of any
+     * {@link #getCustomizers(ConfigBag) customizers} attached to this location.
+     */
+    @Override
+    public void suspendMachine(MachineLocation rawLocation) {
+        String instanceId = vmInstanceIds.remove(rawLocation);
+        if (instanceId == null) {
+            LOG.info("Attempt to suspend unknown machine " + rawLocation + " in " + this);
+            throw new IllegalArgumentException("Unknown machine " + rawLocation);
+        }
+        LOG.info("Suspending machine {} in {}, instance id {}", new Object[]{rawLocation, this, instanceId});
+        Exception toThrow = null;
+        try {
+            getComputeService().suspendNode(instanceId);
+        } catch (Exception e) {
+            toThrow = e;
+            LOG.error("Problem suspending machine " + rawLocation + " in " + this + ", instance id " + instanceId, e);
+        }
+        removeChild(rawLocation);
+        if (toThrow != null) {
+            throw Exceptions.propagate(toThrow);
         }
     }
 
@@ -1292,7 +1339,6 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
                     if (optionsMap.isEmpty()) return;
 
                     Class<? extends TemplateOptions> clazz = options.getClass();
-                    Iterable<Method> methods = Arrays.asList(clazz.getMethods());
                     for(final Map.Entry<String, Object> option : optionsMap.entrySet()) {
                         Maybe<?> result = MethodCoercions.tryFindAndInvokeBestMatchingMethod(options, option.getKey(), option.getValue());
                         if(result.isAbsent()) {
@@ -1531,8 +1577,16 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
                 sshProps.put("user", initialUser);
                 sshProps.put("address", address);
                 sshProps.put("port", port);
-                if (initialPassword.isPresent()) sshProps.put("password", initialPassword.get());
-                if (initialPrivateKey.isPresent()) sshProps.put("privateKeyData", initialPrivateKey.get());
+                if (initialPassword.isPresent()) {
+                    sshProps.put("password", initialPassword.get());
+                } else {
+                    sshProps.remove("password");
+                }
+                if (initialPrivateKey.isPresent()) {
+                    sshProps.put("privateKeyData", initialPrivateKey.get());
+                } else {
+                    sshProps.remove("privateKeyData");
+                }
     
                 // TODO Retrying lots of times as workaround for vcloud-director. There the guest customizations
                 // can cause the VM to reboot shortly after it was ssh'able.
@@ -2137,7 +2191,7 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
             throw new IllegalArgumentException("Unknown machine "+rawMachine);
         }
         JcloudsMachineLocation machine = (JcloudsMachineLocation) rawMachine;
-        
+
         LOG.info("Releasing machine {} in {}, instance id {}", new Object[] {machine, this, instanceId});
 
         Exception tothrow = null;
@@ -2152,6 +2206,9 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
                     + (tothrow==null ? "will throw subsequently" : "swallowing due to previous error")+": "+e, e);
                 if (tothrow==null) tothrow = e;
             }
+        }
+        for (MachineLocationCustomizer customizer : getMachineCustomizers(setup)) {
+            customizer.preRelease(machine);
         }
 
         try {
@@ -2537,7 +2594,7 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
                             return inferredHostAndPort.getHostText();
                         } else {
                             LOG.warn("Error querying aws-ec2 instance "+node.getId()+"@"+node.getLocation()+" over ssh for its hostname; falling back to jclouds metadata for address", e);
-                        }                            
+                        }
                     }
                 }
             }
@@ -2547,12 +2604,18 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
     }
 
     private String getPublicHostnameGeneric(NodeMetadata node, @Nullable ConfigBag setup) {
-        //prefer the public address to the hostname because hostname is sometimes wrong/abbreviated
-        //(see that javadoc; also e.g. on rackspace, the hostname lacks the domain)
+        // JcloudsUtil.getFirstReachableAddress() already succeeded so at least one of the provided
+        // public and private IPs is reachable. Prefer the public IP. Don't use hostname as a fallback
+        // from the public address - if public address is missing why would hostname resolve to a 
+        // public IP? It is sometimes wrong/abbreviated, resolving to the wrong IP, also e.g. on
+        // rackspace, the hostname lacks the domain.
+        //
+        // TODO Some of the private addresses might not be reachable, should check connectivity before
+        // making a choice.
+        // TODO Choose an IP once and stick to it - multiple places call JcloudsUtil.getFirstReachableAddress(),
+        // could even get different IP on each call.
         if (groovyTruth(node.getPublicAddresses())) {
             return node.getPublicAddresses().iterator().next();
-        } else if (groovyTruth(node.getHostname())) {
-            return node.getHostname();
         } else if (groovyTruth(node.getPrivateAddresses())) {
             return node.getPrivateAddresses().iterator().next();
         } else {

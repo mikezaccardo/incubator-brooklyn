@@ -68,11 +68,11 @@
 
         <!-- Dependencies -->
         <brooklyn.version>0.8.0-SNAPSHOT</brooklyn.version>  <!-- BROOKLYN_VERSION -->
-        <jclouds.groupId>org.apache.jclouds</jclouds.groupId>
+        <jclouds.groupId>org.apache.jclouds</jclouds.groupId> <!-- JCLOUDS_GROUPID_VERSION -->
 
         <!-- These dependencies also appear in usage/downstream-parent/pom.xml -
            - please synchronise versions between these two pom files -->
-        <jclouds.version>1.9.1-SNAPSHOT</jclouds.version>
+        <jclouds.version>1.9.1-SNAPSHOT</jclouds.version> <!-- JCLOUDS_VERSION -->
         <logback.version>1.0.7</logback.version>
         <slf4j.version>1.6.6</slf4j.version>  <!-- used for java.util.logging jul-to-slf4j interception -->
         <guava.version>17.0</guava.version>
@@ -777,6 +777,8 @@
                         <excludes combine.children="append">
                             <!-- Exclude sandbox because not part of distribution: not in tgz, and not uploaded to maven-central -->
                             <exclude>sandbox/**</exclude>
+                            <!-- Exclude release because not part of distribution: not in tgz, and not uploaded to maven-central -->
+                            <exclude>release/**</exclude>
                             <!-- Exclude netbeans config files (not part of the project, but often on users' drives -->
                             <exclude>**/nbactions.xml</exclude>
                             <exclude>**/nb-configuration.xml</exclude>
@@ -1409,7 +1411,7 @@
                             <properties>
                                 <property>
                                     <name>listener</name>
-                                    <value>brooklyn.test.LoggingVerboseReporter,brooklyn.test.BrooklynLeakListener,brooklyn.test.PlatformTestSelectorListener</value>
+                                    <value>org.apache.brooklyn.test.LoggingVerboseReporter,org.apache.brooklyn.test.BrooklynLeakListener,org.apache.brooklyn.test.PlatformTestSelectorListener</value>
                                 </property>
                             </properties>
                             <enableAssertions>true</enableAssertions>

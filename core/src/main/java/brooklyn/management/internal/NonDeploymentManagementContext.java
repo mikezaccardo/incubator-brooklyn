@@ -33,7 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import brooklyn.basic.BrooklynObject;
-import brooklyn.catalog.BrooklynCatalog;
+import org.apache.brooklyn.catalog.BrooklynCatalog;
 import brooklyn.catalog.internal.CatalogInitialization;
 import brooklyn.config.BrooklynProperties;
 import brooklyn.config.StringConfigMap;
@@ -601,10 +601,6 @@ public class NonDeploymentManagementContext implements ManagementContextInternal
         }
         @Override
         public ManagementPlaneSyncRecordPersister getPersister() {
-            throw new IllegalStateException("Non-deployment context "+NonDeploymentManagementContext.this+" is not valid for this operation.");
-        }
-        @Override
-        public ManagementPlaneSyncRecord getManagementPlaneSyncState() {
             throw new IllegalStateException("Non-deployment context "+NonDeploymentManagementContext.this+" is not valid for this operation.");
         }
         @Override

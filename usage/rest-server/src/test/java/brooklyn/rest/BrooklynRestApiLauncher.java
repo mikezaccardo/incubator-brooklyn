@@ -19,8 +19,6 @@
 package brooklyn.rest;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import io.brooklyn.camp.brooklyn.BrooklynCampPlatformLauncherAbstract;
-import io.brooklyn.camp.brooklyn.BrooklynCampPlatformLauncherNoServer;
 
 import java.io.File;
 import java.io.FilenameFilter;
@@ -32,6 +30,8 @@ import java.util.List;
 import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
 
+import org.apache.brooklyn.camp.brooklyn.BrooklynCampPlatformLauncherAbstract;
+import org.apache.brooklyn.camp.brooklyn.BrooklynCampPlatformLauncherNoServer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.servlet.FilterHolder;
@@ -56,6 +56,8 @@ import brooklyn.rest.filter.RequestTaggingFilter;
 import brooklyn.rest.security.provider.AnyoneSecurityProvider;
 import brooklyn.rest.security.provider.SecurityProvider;
 import brooklyn.rest.util.ManagementContextProvider;
+import brooklyn.rest.util.ShutdownHandlerProvider;
+import brooklyn.rest.util.TestShutdownHandler;
 import brooklyn.util.exceptions.Exceptions;
 import brooklyn.util.net.Networking;
 import brooklyn.util.text.WildcardGlobs;
@@ -107,6 +109,7 @@ public class BrooklynRestApiLauncher {
     private ContextHandler customContext;
     private boolean deployJsgui = true;
     private boolean disableHighAvailability = true;
+    private final TestShutdownHandler shutdownListener = new TestShutdownHandler();
 
     protected BrooklynRestApiLauncher() {}
 
@@ -235,6 +238,7 @@ public class BrooklynRestApiLauncher {
         ResourceConfig config = new DefaultResourceConfig();
         for (Object r: BrooklynRestApi.getAllResources())
             config.getSingletons().add(r);
+        config.getSingletons().add(new ShutdownHandlerProvider(shutdownListener));
 
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setAttribute(BrooklynServiceAttributes.BROOKLYN_MANAGEMENT_CONTEXT, managementContext);
@@ -326,11 +330,11 @@ public class BrooklynRestApiLauncher {
                 .start();
     }
 
-    public static void installAsServletFilter(ServletContextHandler context) {
+    public void installAsServletFilter(ServletContextHandler context) {
         installAsServletFilter(context, DEFAULT_FILTERS);
     }
 
-    private static void installAsServletFilter(ServletContextHandler context, List<Class<? extends Filter>> filters) {
+    private void installAsServletFilter(ServletContextHandler context, List<Class<? extends Filter>> filters) {
         installBrooklynFilters(context, filters);
 
         // now set up the REST servlet resources
@@ -354,6 +358,7 @@ public class BrooklynRestApiLauncher {
 
         ManagementContext mgmt = (ManagementContext) context.getAttribute(BrooklynServiceAttributes.BROOKLYN_MANAGEMENT_CONTEXT);
         config.getSingletons().add(new ManagementContextProvider(mgmt));
+        config.getSingletons().add(new ShutdownHandlerProvider(shutdownListener));
     }
 
     private static void installBrooklynFilters(ServletContextHandler context, List<Class<? extends Filter>> filters) {

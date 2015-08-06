@@ -1044,6 +1044,11 @@ public abstract class AbstractEntity extends AbstractBrooklynObject implements E
         }
 
         @Override
+        public void removeFromLocalBag(String key) {
+            configsInternal.removeFromLocalBag(key);
+        }
+
+        @Override
         public void refreshInheritedConfig() {
             if (getParent() != null) {
                 configsInternal.setInheritedConfig(((EntityInternal)getParent()).getAllConfig(), ((EntityInternal)getParent()).config().getBag());
@@ -1718,23 +1723,4 @@ public abstract class AbstractEntity extends AbstractBrooklynObject implements E
         super.onTagsChanged();
         getManagementSupport().getEntityChangeListener().onTagsChanged();
     }
-
-    public Set<Object> getTags() {
-        return tags().getTags();
-    }
-
-    @Override
-    public boolean addTag(Object tag) {
-        return tags().addTag(tag);
-    }    
-
-    @Override
-    public boolean removeTag(Object tag) {
-        return tags().removeTag(tag);
-    }    
-
-    @Override
-    public boolean containsTag(Object tag) {
-        return tags().containsTag(tag);
-    }    
 }

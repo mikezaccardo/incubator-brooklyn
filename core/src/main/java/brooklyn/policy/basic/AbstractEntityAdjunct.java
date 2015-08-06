@@ -282,6 +282,11 @@ public abstract class AbstractEntityAdjunct extends AbstractBrooklynObject imple
         }
         
         @Override
+        public void removeFromLocalBag(String key) {
+            configsInternal.removeFromLocalBag(key);
+        }
+        
+        @Override
         public void refreshInheritedConfig() {
             // no-op for location
         }
@@ -294,14 +299,6 @@ public abstract class AbstractEntityAdjunct extends AbstractBrooklynObject imple
 
     public <T> T getConfig(ConfigKey<T> key) {
         return config().get(key);
-    }
-    
-    /**
-     * @deprecated since 0.7.0; use {@link #config()}, such as {@code entity.config().getBag()}
-     */
-    @Deprecated
-    public Map<ConfigKey<?>, Object> getAllConfig() {
-        return configsInternal.getAllConfig();
     }
     
     protected <K> K getRequiredConfig(ConfigKey<K> key) {
@@ -351,21 +348,9 @@ public abstract class AbstractEntityAdjunct extends AbstractBrooklynObject imple
         return getClass().getCanonicalName();
     }
     
-    @Override
-    @Deprecated
-    public String getName() {
-        return getDisplayName();
-    }
-    
     public void setDisplayName(String name) {
         this.name = name;
     }
-
-    /**
-     * @deprecated since 0.7.0; see {@link #setDisplayName(String)}
-     */
-    @Deprecated
-    public void setName(String name) { setDisplayName(name); }
 
     public void setEntity(EntityLocal entity) {
         if (destroyed.get()) throw new IllegalStateException("Cannot set entity on a destroyed entity adjunct");

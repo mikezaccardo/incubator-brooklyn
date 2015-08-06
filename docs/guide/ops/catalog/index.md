@@ -141,7 +141,7 @@ brooklyn.catalog:
   id: datastore
   version: 1.0
   itemType: template
-  iconUrl: classpath://brooklyn/entity/nosql/riak/riak.png
+  iconUrl: classpath://org/apache/brooklyn/entity/nosql/riak/riak.png
   name: Datastore (Riak)
   description: Riak is an open-source NoSQL key-value data store.
   item:
@@ -157,7 +157,7 @@ This YAML will install three items:
 ~~~ yaml
 brooklyn.catalog:
   version: 1.1
-  iconUrl: classpath://brooklyn/entity/nosql/riak/riak.png
+  iconUrl: classpath://org/apache/brooklyn/entity/nosql/riak/riak.png
   description: Riak is an open-source NoSQL key-value data store.
   items:
     - id: riak-node
@@ -302,7 +302,16 @@ The `brooklyn` CLI includes several commands for working with the catalog.
 * `--catalogInitial <file.bom>` will set the catalog items to use on first run,
   on a catalog reset, or if persistence is off
 
-If [persistence](../persistence/) is enabled, catalog additions will remain between runs.
+If `--catalogInitial` is not specified, the default initial catalog at `brooklyn/default.catalog.bom` will be used.
+As `scanJavaAnnotations: true` is set in `default.catalog.bom`, Brooklyn will scan the classpath for catalog items,
+which will be added to the catalog.
+To launch Brooklyn without initializing the catalog, use `--catalogInitial classpath://brooklyn/empty.catalog.bom`
+
+If [persistence](../persistence/) is enabled, catalog additions will remain between runs. If items that were
+previously added based on items in `brooklyn/default.catalog.bom` or `--catalogInitial` are 
+deleted, they will not be re-added on subsequent restarts of brooklyn. I.e. `--catalogInitial` is ignored
+if persistence is enabled and persistent state has already been created.
+
 For more information on these commands, run `brooklyn help launch`.
 
 

@@ -41,8 +41,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.testng.reporters.Files;
 
-import brooklyn.catalog.CatalogItem;
-import brooklyn.catalog.CatalogItem.CatalogBundle;
+import org.apache.brooklyn.catalog.CatalogItem;
+import org.apache.brooklyn.catalog.CatalogItem.CatalogBundle;
 import brooklyn.catalog.internal.CatalogUtils;
 import brooklyn.management.osgi.OsgiStandaloneTest;
 import brooklyn.policy.autoscaling.AutoScalerPolicy;
@@ -51,7 +51,7 @@ import brooklyn.rest.domain.CatalogItemSummary;
 import brooklyn.rest.domain.CatalogLocationSummary;
 import brooklyn.rest.domain.CatalogPolicySummary;
 import brooklyn.rest.testing.BrooklynRestResourceTest;
-import brooklyn.test.TestResourceUnavailableException;
+import org.apache.brooklyn.test.TestResourceUnavailableException;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
@@ -202,7 +202,7 @@ public class CatalogResourceTest extends BrooklynRestResourceTest {
     // not of the entity itself, so the test won't make sense any more.
     public void testGetCatalogEntityDetails() {
         CatalogEntitySummary details = client()
-                .resource(URI.create("/v1/catalog/entities/brooklyn.entity.nosql.redis.RedisStore"))
+                .resource(URI.create("/v1/catalog/entities/org.apache.brooklyn.entity.nosql.redis.RedisStore"))
                 .get(CatalogEntitySummary.class);
         assertTrue(details.toString().contains("redis.port"), "expected more config, only got: "+details);
         String iconUrl = "/v1/catalog/icon/" + details.getSymbolicName();
@@ -215,7 +215,7 @@ public class CatalogResourceTest extends BrooklynRestResourceTest {
     // not of the entity itself, so the test won't make sense any more.
     public void testGetCatalogEntityPlusVersionDetails() {
         CatalogEntitySummary details = client()
-                .resource(URI.create("/v1/catalog/entities/brooklyn.entity.nosql.redis.RedisStore:0.0.0.SNAPSHOT"))
+                .resource(URI.create("/v1/catalog/entities/org.apache.brooklyn.entity.nosql.redis.RedisStore:0.0.0.SNAPSHOT"))
                 .get(CatalogEntitySummary.class);
         assertTrue(details.toString().contains("redis.port"), "expected more config, only got: "+details);
         String expectedIconUrl = "/v1/catalog/icon/" + details.getSymbolicName() + "/" + details.getVersion();
@@ -236,7 +236,7 @@ public class CatalogResourceTest extends BrooklynRestResourceTest {
     }
 
     private void addTestCatalogItemRedisAsEntity(String catalogItemId) {
-        addTestCatalogItem(catalogItemId, null, TEST_VERSION, "brooklyn.entity.nosql.redis.RedisStore");
+        addTestCatalogItem(catalogItemId, null, TEST_VERSION, "org.apache.brooklyn.entity.nosql.redis.RedisStore");
     }
 
     private void addTestCatalogItem(String catalogItemId, String itemType, String version, String service) {
