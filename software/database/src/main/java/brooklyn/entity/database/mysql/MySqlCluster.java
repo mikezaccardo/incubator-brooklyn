@@ -20,10 +20,7 @@ package brooklyn.entity.database.mysql;
 
 import java.util.Collection;
 
-import org.apache.brooklyn.catalog.Catalog;
-
-import com.google.common.reflect.TypeToken;
-
+import brooklyn.catalog.Catalog;
 import brooklyn.config.ConfigKey;
 import brooklyn.entity.basic.ConfigKeys;
 import brooklyn.entity.database.DatastoreMixins.HasDatastoreUrl;
@@ -32,6 +29,8 @@ import brooklyn.entity.proxying.ImplementedBy;
 import brooklyn.event.AttributeSensor;
 import brooklyn.event.basic.BasicAttributeSensorAndConfigKey.StringAttributeSensorAndConfigKey;
 import brooklyn.event.basic.Sensors;
+
+import com.google.common.reflect.TypeToken;
 
 @ImplementedBy(MySqlClusterImpl.class)
 @Catalog(name="MySql Master-Slave cluster", description="Sets up a cluster of MySQL nodes using master-slave relation and binary logging", iconUrl="classpath:///mysql-logo-110x57.png")
