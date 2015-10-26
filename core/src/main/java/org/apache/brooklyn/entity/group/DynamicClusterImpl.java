@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.annotation.Nullable;
@@ -70,6 +72,8 @@ import org.apache.brooklyn.util.text.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import ch.qos.logback.core.spi.LifeCycle;
+
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
@@ -94,6 +98,8 @@ public class DynamicClusterImpl extends AbstractGroupImpl implements DynamicClus
     @SuppressWarnings("serial")
     private static final AttributeSensor<Supplier<Integer>> NEXT_CLUSTER_MEMBER_ID = Sensors.newSensor(new TypeToken<Supplier<Integer>>() {},
             "next.cluster.member.id", "Returns the ID number of the next member to be added");
+
+    private final Timer allMembersUpCheckTaskTimer = new Timer();
 
     // TODO better mechanism for arbitrary class name to instance type coercion
     static {
@@ -145,7 +151,7 @@ public class DynamicClusterImpl extends AbstractGroupImpl implements DynamicClus
 
             for (Entity contender : contenders) {
                 boolean newer = contender.getCreationTime() > newestTime;
-                if ((contender instanceof Startable && newer) || 
+                if ((contender instanceof Startable && newer) ||
                     (!(newest instanceof Startable) && ((contender instanceof Startable) || newer))) {
                     newest = contender;
                     newestTime = contender.getCreationTime();
@@ -164,6 +170,31 @@ public class DynamicClusterImpl extends AbstractGroupImpl implements DynamicClus
         }
     }
 
+    private class AllMembersUpCheckTask extends TimerTask {
+
+        @Override
+        public void run() {
+            if (DynamicClusterImpl.this.getMembers().isEmpty()) {
+                DynamicClusterImpl.this.sensors().set(ALL_MEMBERS_UP, false);
+                return;
+            }
+
+            if (Lifecycle.RUNNING != DynamicClusterImpl.this.sensors().get(SERVICE_STATE_ACTUAL)) {
+                DynamicClusterImpl.this.sensors().set(ALL_MEMBERS_UP, false);
+                return;
+            }
+
+            for (Entity member : DynamicClusterImpl.this.getMembers()) {
+                if (Boolean.FALSE.equals(member.sensors().get(SERVICE_UP))) {
+                    DynamicClusterImpl.this.sensors().set(ALL_MEMBERS_UP, false);
+                    return;
+                }
+            }
+
+            DynamicClusterImpl.this.sensors().set(ALL_MEMBERS_UP, true);
+        }
+    }
+
     public DynamicClusterImpl() {
     }
 
@@ -171,6 +202,7 @@ public class DynamicClusterImpl extends AbstractGroupImpl implements DynamicClus
     public void init() {
         super.init();
         initialiseMemberId();
+        allMembersUpCheckTaskTimer.schedule(new AllMembersUpCheckTask(), 0, 10000);
     }
 
     private void initialiseMemberId() {
@@ -179,6 +211,8 @@ public class DynamicClusterImpl extends AbstractGroupImpl implements DynamicClus
                 sensors().set(NEXT_CLUSTER_MEMBER_ID, new NextClusterMemberIdSupplier());
             }
         }
+
+        sensors().set(NEXT_CLUSTER_MEMBER_ID, new NextClusterMemberIdSupplier());
     }
 
     @Override
@@ -188,13 +222,14 @@ public class DynamicClusterImpl extends AbstractGroupImpl implements DynamicClus
             config().set(UP_QUORUM_CHECK, QuorumChecks.atLeastOneUnlessEmpty());
             sensors().set(SERVICE_UP, true);
         } else {
+            config().set(UP_QUORUM_CHECK, QuorumChecks.allAndAtLeastOne());
             sensors().set(SERVICE_UP, false);
         }
         super.initEnrichers();
         // override previous enricher so that only members are checked
         ServiceStateLogic.newEnricherFromChildrenUp().checkMembersOnly().requireUpChildren(getConfig(UP_QUORUM_CHECK)).addTo(this);
     }
-    
+
     @Override
     public void setRemovalStrategy(Function<Collection<Entity>, Entity> val) {
         config().set(REMOVAL_STRATEGY, checkNotNull(val, "removalStrategy"));
@@ -305,7 +340,7 @@ public class DynamicClusterImpl extends AbstractGroupImpl implements DynamicClus
         try {
             doStart();
             DynamicTasks.waitForLast();
-            
+
         } catch (Exception e) {
             ServiceProblemsLogic.updateProblemsIndicator(this, START, "start failed with error: "+e);
             throw Exceptions.propagate(e);
@@ -369,7 +404,7 @@ public class DynamicClusterImpl extends AbstractGroupImpl implements DynamicClus
                 }
             }
             throw new IllegalStateException(message, firstError);
-            
+
         } else if (currentSize < initialSize) {
             LOG.warn(
                     "On start of cluster {}, size {} reached initial minimum quorum size of {} but did not reach desired size {}; continuing",
@@ -439,6 +474,11 @@ public class DynamicClusterImpl extends AbstractGroupImpl implements DynamicClus
         } catch (Exception e) {
             ServiceStateLogic.setExpectedState(this, Lifecycle.ON_FIRE);
             throw Exceptions.propagate(e);
+        }
+        finally {
+            allMembersUpCheckTaskTimer.cancel();
+            allMembersUpCheckTaskTimer.purge();
+            sensors().set(ALL_MEMBERS_UP, false);
         }
     }
 
@@ -513,7 +553,7 @@ public class DynamicClusterImpl extends AbstractGroupImpl implements DynamicClus
                 }
             } else {
                 // Replacing member, so new member should be in the same location as that being replaced.
-                // Expect this to agree with `getMemberSpec().getLocations()` (if set). If not, then 
+                // Expect this to agree with `getMemberSpec().getLocations()` (if set). If not, then
                 // presumably there was a reason this specific member was started somewhere else!
                 memberLoc = getLocation();
             }
@@ -669,7 +709,7 @@ public class DynamicClusterImpl extends AbstractGroupImpl implements DynamicClus
 
     protected ReferenceWithError<Optional<Entity>> addInSingleLocation(Location location, Map<?,?> flags) {
         ReferenceWithError<Collection<Entity>> added = addInEachLocation(ImmutableList.of(location), flags);
-        
+
         Optional<Entity> result = Iterables.isEmpty(added.getWithoutError()) ? Optional.<Entity>absent() : Optional.of(Iterables.getOnlyElement(added.get()));
         if (!added.hasError()) {
             return ReferenceWithError.newInstanceWithoutError( result );
@@ -716,7 +756,7 @@ public class DynamicClusterImpl extends AbstractGroupImpl implements DynamicClus
                 }
             }
         }
-        
+
         Collection<Entity> result = MutableList.<Entity> builder()
             .addAll(addedEntities)
             .removeAll(errors.keySet())
@@ -798,7 +838,7 @@ public class DynamicClusterImpl extends AbstractGroupImpl implements DynamicClus
             LOG.debug("Creating and adding a node to cluster {}({}) with properties {}", new Object[] { this, getId(), createFlags });
         }
 
-        // TODO should refactor to have a createNodeSpec; and spec should support initial sensor values 
+        // TODO should refactor to have a createNodeSpec; and spec should support initial sensor values
         Entity entity = createNode(loc, createFlags);
 
         entity.sensors().set(CLUSTER_MEMBER, true);
@@ -816,7 +856,7 @@ public class DynamicClusterImpl extends AbstractGroupImpl implements DynamicClus
         EntitySpec<?> memberSpec = null;
         if (getMembers().isEmpty()) memberSpec = getFirstMemberSpec();
         if (memberSpec == null) memberSpec = getMemberSpec();
-        
+
         if (memberSpec != null) {
             return addChild(EntitySpec.create(memberSpec).configure(flags).location(loc));
         }
@@ -836,9 +876,9 @@ public class DynamicClusterImpl extends AbstractGroupImpl implements DynamicClus
     }
 
     protected List<Entity> pickAndRemoveMembers(int delta) {
-        if (delta==0) 
+        if (delta==0)
             return Lists.newArrayList();
-        
+
         if (delta == 1 && !isAvailabilityZoneEnabled()) {
             Maybe<Entity> member = tryPickAndRemoveMember();
             return (member.isPresent()) ? ImmutableList.of(member.get()) : ImmutableList.<Entity>of();

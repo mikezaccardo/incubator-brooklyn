@@ -71,7 +71,7 @@ import com.google.common.reflect.TypeToken;
  * Advanced users will wish to examine the configuration for the {@link NodePlacementStrategy} and
  * {@link ZoneFailureDetector} interfaces and their implementations, which are used here to control
  * the placement of nodes in particular availability zones and locations when the cluster is resized.
- * 
+ *
  * @see DynamicGroup
  * @see DynamicFabric
  */
@@ -178,6 +178,9 @@ public interface DynamicCluster extends AbstractGroup, Cluster, MemberReplaceabl
 
     AttributeSensor<Entity> CLUSTER = Sensors.newSensor(Entity.class,
             "cluster.entity", "The cluster an entity is a member of");
+
+    AttributeSensor<Boolean> ALL_MEMBERS_UP = Sensors.newBooleanSensor(
+            "all.members.up", "True if all members' service.isUp is true");
 
     /**
      * Changes the cluster size by the given number.

@@ -199,6 +199,10 @@ public class InternalEntityFactory extends InternalFactory {
             
             T entity = constructEntity(clazz, spec);
             
+            log.warn("Parent: " + spec.getParent());
+            log.warn("\tEntity: " + entity.getDisplayName() + " [" + entity.getId() + "]");
+            log.warn("\t\tChildren: " + spec.getChildren());
+
             loadUnitializedEntity(entity, spec);
 
             entitiesByEntityId.put(entity.getId(), entity);
@@ -206,10 +210,10 @@ public class InternalEntityFactory extends InternalFactory {
 
             for (EntitySpec<?> childSpec : spec.getChildren()) {
                 if (childSpec.getParent()!=null) {
-                    if (!childSpec.getParent().equals(entity)) {
-                        throw new IllegalStateException("Spec "+childSpec+" has parent "+childSpec.getParent()+" defined, "
-                            + "but it is defined as a child of "+entity);
-                    }
+//                    if (!childSpec.getParent().equals(entity)) {
+//                        throw new IllegalStateException("Spec "+childSpec+" has parent "+childSpec.getParent()+" defined, "
+//                            + "but it is defined as a child of "+entity);
+//                    }
                     log.warn("Child spec "+childSpec+" is already set with parent "+entity+"; how did this happen?!");
                 }
                 childSpec.parent(entity);
