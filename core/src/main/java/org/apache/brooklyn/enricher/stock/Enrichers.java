@@ -38,6 +38,7 @@ import org.apache.brooklyn.enricher.stock.reducer.Reducer;
 import org.apache.brooklyn.util.collections.MutableList;
 import org.apache.brooklyn.util.collections.MutableMap;
 import org.apache.brooklyn.util.collections.MutableSet;
+import org.apache.brooklyn.util.collections.QuorumCheck;
 import org.apache.brooklyn.util.core.flags.TypeCoercions;
 import org.apache.brooklyn.util.text.StringPredicates;
 import org.apache.brooklyn.util.text.Strings;
@@ -59,7 +60,7 @@ import com.google.common.reflect.TypeToken;
 public class Enrichers {
 
     private Enrichers() {}
-    
+
     public static InitialBuilder builder() {
         return new InitialBuilder();
     }
@@ -70,17 +71,17 @@ public class Enrichers {
            return (B) this;
         }
     }
-    
+
     public abstract static class AbstractEnricherBuilder<B extends AbstractEnricherBuilder<B>> extends Builder<B> {
         final Class<? extends Enricher> enricherType;
         Boolean suppressDuplicates;
         String uniqueTag;
         Set<Object> tags = MutableSet.of();
-        
+
         public AbstractEnricherBuilder(Class<? extends Enricher> enricherType) {
             this.enricherType = enricherType;
         }
-        
+
         public B uniqueTag(String tag) {
             uniqueTag = Preconditions.checkNotNull(tag);
             return self();
@@ -95,24 +96,24 @@ public class Enrichers {
         }
 
         protected abstract String getDefaultUniqueTag();
-        
+
         protected EnricherSpec<? extends Enricher> build() {
             EnricherSpec<? extends Enricher> spec = EnricherSpec.create(enricherType);
-            
+
             String uniqueTag2 = uniqueTag;
             if (uniqueTag2==null)
                 uniqueTag2 = getDefaultUniqueTag();
             if (uniqueTag2!=null)
                 spec.uniqueTag(uniqueTag2);
-            
+
             if (!tags.isEmpty()) spec.tags(tags);
             if (suppressDuplicates!=null)
                 spec.configure(AbstractEnricher.SUPPRESS_DUPLICATES, suppressDuplicates);
-            
+
             return spec;
         }
     }
-    
+
     protected abstract static class AbstractInitialBuilder<B extends AbstractInitialBuilder<B>> extends Builder<B> {
         public PropagatorBuilder propagating(Map<? extends Sensor<?>, ? extends Sensor<?>> vals) {
             return new PropagatorBuilder(vals);
@@ -135,7 +136,7 @@ public class Enrichers {
         public PropagatorBuilder propagatingAllBut(Iterable<? extends Sensor<?>> vals) {
             return new PropagatorBuilder(true, vals);
         }
-        
+
         /**
          * Builds an enricher which transforms a given sensor:
          * <li> applying a (required) function ({@link TransformerBuilder#computing(Function)}, or
@@ -162,7 +163,7 @@ public class Enrichers {
         public <S> AggregatorBuilder<S, Object> aggregating(AttributeSensor<S> val) {
             return new AggregatorBuilder<S,Object>(val);
         }
-        /** creates an {@link UpdatingMap} enricher: 
+        /** creates an {@link UpdatingMap} enricher:
          * {@link UpdatingMapBuilder#from(AttributeSensor)} and {@link UpdatingMapBuilder#computing(Function)} are required
          **/
         public <S,TKey,TVal> UpdatingMapBuilder<S, TKey, TVal> updatingMap(AttributeSensor<Map<TKey,TVal>> target) {
@@ -196,7 +197,7 @@ public class Enrichers {
         protected Predicate<Object> valueFilter;
         protected Object defaultValueForUnreportedSensors;
         protected Object valueToReportIfNoSensors;
-        
+
         public AbstractAggregatorBuilder(AttributeSensor<S> aggregating) {
             super(Aggregator.class);
             this.aggregating = aggregating;
@@ -301,7 +302,7 @@ public class Enrichers {
                     }
                 };
                 // above kept for deserialization; not sure necessary
-                valueFilter = StringPredicates.isNonBlank(); 
+                valueFilter = StringPredicates.isNonBlank();
             } else {
                 valueFilter = null;
             }
@@ -319,7 +320,7 @@ public class Enrichers {
                             .putIfNotNull(Aggregator.DEFAULT_MEMBER_VALUE, defaultValueForUnreportedSensors)
                             .build());
         }
-        
+
         @Override
         public String toString() {
             return Objects.toStringHelper(this)
@@ -339,7 +340,7 @@ public class Enrichers {
                     .toString();
         }
     }
-    
+
     protected abstract static class AbstractCombinerBuilder<S, T, B extends AbstractCombinerBuilder<S, T, B>> extends AbstractEnricherBuilder<B> {
         protected final List<AttributeSensor<? extends S>> combining;
         protected AttributeSensor<T> publishing;
@@ -351,7 +352,7 @@ public class Enrichers {
 
         // For summing/averaging
         protected Object defaultValueForUnreportedSensors;
-        
+
         @SafeVarargs
         public AbstractCombinerBuilder(AttributeSensor<? extends S>... vals) {
             this(ImmutableList.copyOf(vals));
@@ -418,7 +419,7 @@ public class Enrichers {
                             .putIfNotNull(Combiner.VALUE_FILTER, valueFilter)
                             .build());
         }
-        
+
         @Override
         public String toString() {
             return Objects.toStringHelper(this)
@@ -476,7 +477,7 @@ public class Enrichers {
                             .putIfNotNull(Transformer.TRANSFORMATION_FROM_EVENT, computingFromEvent)
                             .build());
         }
-        
+
         @Override
         public String toString() {
             return Objects.toStringHelper(this)
@@ -495,7 +496,7 @@ public class Enrichers {
         protected final Iterable<? extends Sensor<?>> propagatingAllBut;
         protected Entity fromEntity;
         protected Task<? extends Entity> fromEntitySupplier;
-        
+
         public AbstractPropagatorBuilder(Map<? extends Sensor<?>, ? extends Sensor<?>> vals) {
             super(Propagator.class);
             checkArgument(checkNotNull(vals).size() > 0, "propagating-sensors must be non-empty");
@@ -544,10 +545,10 @@ public class Enrichers {
                 for (Sensor<?> s: propagatingAllBut) allBut.add(s.getName());
                 summary.add("ALL_BUT:"+com.google.common.base.Joiner.on(",").join(allBut));
             }
-            
-            // TODO What to use as the entity id if using fromEntitySupplier? 
+
+            // TODO What to use as the entity id if using fromEntitySupplier?
             String fromId = (fromEntity != null) ? fromEntity.getId() : fromEntitySupplier.getId();
-            
+
             return "propagating["+fromId+":"+com.google.common.base.Joiner.on(",").join(summary)+"]";
         }
         public EnricherSpec<? extends Enricher> build() {
@@ -559,7 +560,7 @@ public class Enrichers {
                             .putIfNotNull(Propagator.PROPAGATING_ALL_BUT, propagatingAllBut)
                             .build());
         }
-        
+
         @Override
         public String toString() {
             return Objects.toStringHelper(this)
@@ -579,7 +580,7 @@ public class Enrichers {
         protected TKey key;
         protected Function<S, ? extends TVal> computing;
         protected Boolean removingIfResultIsNull;
-        
+
         public AbstractUpdatingMapBuilder(AttributeSensor<Map<TKey,TVal>> target) {
             super(UpdatingMap.class);
             this.targetSensor = target;
@@ -618,7 +619,7 @@ public class Enrichers {
                             .putIfNotNull(UpdatingMap.REMOVING_IF_RESULT_IS_NULL, removingIfResultIsNull)
                             .build());
         }
-        
+
         @Override
         public String toString() {
             return Objects.toStringHelper(this)
@@ -681,7 +682,7 @@ public class Enrichers {
                             .putIfNotNull(Joiner.MAXIMUM, maximum)
                             .build());
         }
-        
+
         @Override
         public String toString() {
             return Objects.toStringHelper(this)
@@ -705,7 +706,7 @@ public class Enrichers {
             super(checkNotNull(clazz));
             this.reducing = checkNotNull(val);
         }
-        
+
         public B publishing(AttributeSensor<?> val) {
             this.publishing =  checkNotNull(val);
             return self();
@@ -720,11 +721,11 @@ public class Enrichers {
             this.computing = checkNotNull(val);
             return self();
         }
-        
+
         public B computing(String functionName) {
             return computing(functionName, ImmutableMap.<String, Object>of());
         }
-        
+
         public B computing(String functionName, Map<String, Object> parameters) {
             this.functionName = functionName;
             this.parameters = parameters;
@@ -748,7 +749,7 @@ public class Enrichers {
             return "reducer:" + reducing.toString();
         }
     }
-    
+
     public static class InitialBuilder extends AbstractInitialBuilder<InitialBuilder> {
     }
 
@@ -853,12 +854,12 @@ public class Enrichers {
     protected static <T extends Number> T average(Collection<T> vals, Number defaultValueForUnreportedSensors, Number valueToReportIfNoSensors, TypeToken<T> type) {
         Double doubleValueToReportIfNoSensors = (valueToReportIfNoSensors == null) ? null : valueToReportIfNoSensors.doubleValue();
         int count = count(vals, defaultValueForUnreportedSensors!=null);
-        Double result = (count==0) ? doubleValueToReportIfNoSensors : 
+        Double result = (count==0) ? doubleValueToReportIfNoSensors :
             (Double) ((sum(vals, defaultValueForUnreportedSensors, 0, TypeToken.of(Double.class)) / count));
-        
+
         return cast(result, type);
     }
-    
+
     @SuppressWarnings("unchecked")
     protected static <N extends Number> N cast(Number n, TypeToken<? extends N> numberType) {
         return (N) TypeCoercions.castPrimitive(n, numberType.getRawType());
@@ -869,7 +870,7 @@ public class Enrichers {
         double result = 0d;
         int count = 0;
         if (vals!=null) {
-            for (Number val : vals) { 
+            for (Number val : vals) {
                 if (val!=null) {
                     result += val.doubleValue();
                     count++;
@@ -882,15 +883,48 @@ public class Enrichers {
         if (count==0) return cast(valueIfNone, type);
         return cast(result, type);
     }
-    
+
     protected static int count(Iterable<? extends Object> vals, boolean includeNullValues) {
         int result = 0;
-        if (vals != null) 
-            for (Object val : vals) 
+        if (vals != null)
+            for (Object val : vals)
                 if (val!=null || includeNullValues) result++;
         return result;
     }
-    
+
+    @Beta
+    public static class ComputingTruth<T extends Object> implements Function<Collection<T>, T> {
+        protected final TypeToken<T> typeToken;
+        protected final QuorumCheck quorumCheck;
+        protected final int totalSize;
+
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        public ComputingTruth(TypeToken<T> typeToken, QuorumCheck quorumCheck, int totalSize) {
+            this.quorumCheck = quorumCheck;
+            this.totalSize = totalSize;
+
+            if (typeToken!=null && TypeToken.of(Boolean.class).isAssignableFrom(typeToken.getType())) {
+                this.typeToken = typeToken;
+            } else if (typeToken==null || typeToken.isAssignableFrom(Boolean.class)) {
+                this.typeToken = (TypeToken)TypeToken.of(Boolean.class);
+            } else {
+                throw new IllegalArgumentException("Type "+typeToken+" is not valid for "+this);
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public T apply(Collection<T> input) {
+            int numTrue = 0;
+
+            for (T inputVal : input)
+                if (Boolean.TRUE.equals(inputVal))
+                    numTrue++;
+
+            return (T) Boolean.valueOf(quorumCheck.isQuorate(numTrue, totalSize));
+        }
+    }
+
     private static <T> Map<T,T> newIdentityMap(Set<T> keys) {
         Map<T,T> result = Maps.newLinkedHashMap();
         for (T key : keys) {
@@ -898,6 +932,6 @@ public class Enrichers {
         }
         return result;
     }
-    
+
 
 }

@@ -35,6 +35,7 @@ import org.apache.brooklyn.core.BrooklynLogging;
 import org.apache.brooklyn.core.config.ConfigKeys;
 import org.apache.brooklyn.util.collections.MutableList;
 import org.apache.brooklyn.util.collections.MutableMap;
+import org.apache.brooklyn.util.collections.QuorumCheck.QuorumChecks;
 import org.apache.brooklyn.util.core.flags.SetFromFlag;
 import org.apache.brooklyn.util.exceptions.Exceptions;
 import org.apache.brooklyn.util.text.StringPredicates;
@@ -55,18 +56,22 @@ public class Aggregator<T,U> extends AbstractAggregator<T,U> implements SensorEv
     private static final Logger LOG = LoggerFactory.getLogger(Aggregator.class);
 
     public static final ConfigKey<Sensor<?>> SOURCE_SENSOR = ConfigKeys.newConfigKey(new TypeToken<Sensor<?>>() {}, "enricher.sourceSensor");
-    
+
     @SetFromFlag("transformation")
     public static final ConfigKey<Object> TRANSFORMATION_UNTYPED = ConfigKeys.newConfigKey(Object.class, "enricher.transformation.untyped",
         "Specifies a transformation, as a function from a collection to the value, or as a string matching a pre-defined named transformation, "
         + "such as 'average' (for numbers), 'sum' (for numbers), or 'list' (the default, putting any collection of items into a list)");
     public static final ConfigKey<Function<? super Collection<?>, ?>> TRANSFORMATION = ConfigKeys.newConfigKey(new TypeToken<Function<? super Collection<?>, ?>>() {}, "enricher.transformation");
-    
+
     public static final ConfigKey<Boolean> EXCLUDE_BLANK = ConfigKeys.newBooleanConfigKey("enricher.aggregator.excludeBlank", "Whether explicit nulls or blank strings should be excluded (default false); this only applies if no value filter set", false);
+
+    public static final ConfigKey<String> QUORUM_CHECK_TYPE = ConfigKeys.newStringConfigKey("quorum.check.type", "The requirement to be considered quorate", "allAndAtLeastOne");
+
+    public static final ConfigKey<Integer> QUORUM_TOTAL_SIZE = ConfigKeys.newIntegerConfigKey("quorum.total.size", "The total size to consider when determining if quorate", 1);
 
     protected Sensor<T> sourceSensor;
     protected Function<? super Collection<T>, ? extends U> transformation;
-    
+
     /**
      * Users of values should either on it synchronize when iterating over its entries or use
      * copyOfValues to obtain an immutable copy of the map.
@@ -80,9 +85,9 @@ public class Aggregator<T,U> extends AbstractAggregator<T,U> implements SensorEv
     protected void setEntityLoadingConfig() {
         super.setEntityLoadingConfig();
         this.sourceSensor = (Sensor<T>) getRequiredConfig(SOURCE_SENSOR);
-        
+
         this.transformation = (Function<? super Collection<T>, ? extends U>) config().get(TRANSFORMATION);
-        
+
         Object t1 = config().get(TRANSFORMATION_UNTYPED);
         Function<? super Collection<?>, ?> t2 = null;
         if (t1 instanceof String) {
@@ -91,18 +96,19 @@ public class Aggregator<T,U> extends AbstractAggregator<T,U> implements SensorEv
                 LOG.warn("Unknown transformation '"+t1+"' for "+this+"; will use default transformation");
             }
         }
-        
+
         if (this.transformation==null) {
             this.transformation = (Function<? super Collection<T>, ? extends U>) t2;
         } else if (t1!=null && !Objects.equals(t2, this.transformation)) {
             throw new IllegalStateException("Cannot supply both "+TRANSFORMATION_UNTYPED+" and "+TRANSFORMATION+" unless they are equal.");
         }
     }
-        
+
     @SuppressWarnings({ "rawtypes", "unchecked" })
     protected Function<? super Collection<?>, ?> lookupTransformation(String t1) {
         if ("average".equalsIgnoreCase(t1)) return new Enrichers.ComputingAverage(null, null, targetSensor.getTypeToken());
         if ("sum".equalsIgnoreCase(t1)) return new Enrichers.ComputingSum(null, null, targetSensor.getTypeToken());
+        if ("truth".equalsIgnoreCase(t1)) return new Enrichers.ComputingTruth(targetSensor.getTypeToken(), QuorumChecks.of(config().get(QUORUM_CHECK_TYPE)), config().get(QUORUM_TOTAL_SIZE));
         if ("list".equalsIgnoreCase(t1)) return new ComputingList();
         return null;
     }
@@ -113,9 +119,9 @@ public class Aggregator<T,U> extends AbstractAggregator<T,U> implements SensorEv
             if (input==null) return null;
             return MutableList.copyOf(input).asUnmodifiable();
         }
-        
+
     }
-    
+
     @Override
     protected void setEntityBeforeSubscribingProducerChildrenEvents() {
         BrooklynLogging.log(LOG, BrooklynLogging.levelDebugOrTraceIfReadOnly(producer),
@@ -164,7 +170,7 @@ public class Aggregator<T,U> extends AbstractAggregator<T,U> implements SensorEv
             }
         }
     }
-    
+
     @Override
     protected Predicate<?> getDefaultValueFilter() {
         if (getConfig(EXCLUDE_BLANK))
@@ -172,7 +178,7 @@ public class Aggregator<T,U> extends AbstractAggregator<T,U> implements SensorEv
         else
             return Predicates.alwaysTrue();
     }
-    
+
     @Override
     protected void onProducerRemoved(Entity producer) {
         values.remove(producer);
@@ -200,7 +206,7 @@ public class Aggregator<T,U> extends AbstractAggregator<T,U> implements SensorEv
             throw Exceptions.propagate(t);
         }
     }
-    
+
     @Override
     protected Object compute() {
         synchronized (values) {
@@ -210,7 +216,7 @@ public class Aggregator<T,U> extends AbstractAggregator<T,U> implements SensorEv
             return transformation.apply(vs);
         }
     }
-    
+
     protected Map<Entity, T> copyOfValues() {
         // Don't use ImmutableMap, as can contain null values
         synchronized (values) {
