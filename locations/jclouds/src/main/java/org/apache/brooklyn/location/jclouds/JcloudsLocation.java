@@ -115,6 +115,8 @@ import org.apache.brooklyn.util.text.KeyValueParser;
 import org.apache.brooklyn.util.text.Strings;
 import org.apache.brooklyn.util.time.Duration;
 import org.apache.brooklyn.util.time.Time;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.jclouds.aws.ec2.compute.AWSEC2TemplateOptions;
 import org.jclouds.cloudstack.compute.options.CloudStackTemplateOptions;
 import org.jclouds.compute.ComputeService;
@@ -1202,7 +1204,7 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
                     }})
             .put(INBOUND_PORTS, new CustomizeTemplateOptions() {
                     public void apply(TemplateOptions t, ConfigBag props, Object v) {
-                        int[] inboundPorts = toIntArray(v);
+                        int[] inboundPorts = toIntPortArray(v);
                         if (LOG.isDebugEnabled()) LOG.debug("opening inbound ports {} for cloud/type {}", Arrays.toString(inboundPorts), t.getClass());
                         t.inboundPorts(inboundPorts);
                     }})
@@ -3002,6 +3004,44 @@ public class JcloudsLocation extends AbstractCloudMachineProvisioningLocation im
         } else {
             throw new IllegalArgumentException("Invalid type for byte[]: "+v+" of type "+v.getClass());
         }
+    }
+    
+    protected static int[] toIntPortArray(Object v) {
+        String[] portStringArray = toStringArray(v);
+        Set<Integer> portsList = Sets.newTreeSet();
+        
+        for (String portOrRange : portStringArray) {
+            if (NumberUtils.isNumber(portOrRange))
+                portsList.add(Integer.parseInt(portOrRange));
+            else {
+                if (!portOrRange.contains("-"))
+                    throw new IllegalArgumentException("Invalid format for port range: '" + portOrRange + "'");
+                
+                String portRange = portOrRange.replaceAll("\\s+","");
+                String[] portMinAndMax = portRange.split("-");
+                int min, max;
+                
+                try {
+                    min = Integer.parseInt(portMinAndMax[0]);
+                } catch (NumberFormatException e) {
+                    throw new IllegalArgumentException("Invalid format for port minumum: '" + portMinAndMax[0] + "'");
+                }
+                
+                try {
+                    max = Integer.parseInt(portMinAndMax[1]);
+                } catch (NumberFormatException e) {
+                    throw new IllegalArgumentException("Invalid format for port maximum: '" + portMinAndMax[1] + "'");
+                }
+                
+                if (min >= max)
+                    throw new IllegalArgumentException("Invalid port minimum and maximum values -- minimum must be less than maximum : '" + min + ", " + max + "'");
+                
+                for (int i = min; i <= max; i++)
+                    portsList.add(i);
+            }
+        }
+        
+        return ArrayUtils.toPrimitive(portsList.toArray(new Integer[0]));
     }
 
     // Handles GString
